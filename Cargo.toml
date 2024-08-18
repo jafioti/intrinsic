@@ -1,0 +1,9 @@
+[package]
+name = "intrinsic"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+egglog = "0.2.0"
+generational-box = "0.5.6"
+rustc-hash = "2.0.0"
