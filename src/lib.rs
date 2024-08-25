@@ -1,3 +1,6 @@
+mod egglog;
+mod mcts;
+
 use generational_box::{AnyStorage, GenerationalBox, Owner, UnsyncStorage};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
