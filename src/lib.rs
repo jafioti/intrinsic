@@ -4,6 +4,7 @@ mod mcts;
 use generational_box::{AnyStorage, GenerationalBox, Owner, UnsyncStorage};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::*;
 
@@ -103,11 +104,63 @@ impl Term {
             _ => None,
         }
     }
+
+    pub fn term_name(&self) -> &str {
+        match self {
+            Term::Add => "Add",
+            Term::Sub => "Sub",
+            Term::Mul => "Mul",
+            Term::Div => "Div",
+            Term::Mod => "Mod",
+            Term::Min => "Min",
+            Term::Max => "Max",
+            Term::And => "And",
+            Term::Or => "Or",
+            Term::Gte => "Gte",
+            Term::Lt => "Lt",
+            _ => "",
+        }
+    }
 }
 
 impl Default for Term {
     fn default() -> Self {
         Self::Num(0)
+    }
+}
+
+impl Debug for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut symbols = vec![];
+        for term in self.terms.read().iter() {
+            let new_symbol = match term {
+                Term::Num(n) => n.to_string(),
+                Term::Var(c) => c.to_string(),
+                Term::Max => format!(
+                    "max({}, {})",
+                    symbols.pop().unwrap(),
+                    symbols.pop().unwrap()
+                ),
+                Term::Min => format!(
+                    "min({}, {})",
+                    symbols.pop().unwrap(),
+                    symbols.pop().unwrap()
+                ),
+                _ => format!(
+                    "({}{term:?}{})",
+                    symbols.pop().unwrap(),
+                    symbols.pop().unwrap()
+                ),
+            };
+            symbols.push(new_symbol);
+        }
+        write!(f, "{}", symbols.pop().unwrap())
+    }
+}
+
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 
@@ -137,6 +190,14 @@ impl Expression {
             }
         }
         stack.pop().map(|i| i as usize)
+    }
+
+    pub fn len(&self) -> usize {
+        self.terms.read().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
