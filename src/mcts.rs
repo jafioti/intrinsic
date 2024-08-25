@@ -50,15 +50,13 @@ impl Evaluator<MyMCTS> for MyEvaluator {
         moves: &Vec<char>,
         _: Option<SearchHandle<MyMCTS>>,
     ) -> (Vec<()>, i64) {
-        (
-            vec![(); moves.len()],
-            TARGET
-                .chars()
-                .take(state.0.len())
-                .zip(state.0.chars())
-                .map(|(a, b)| (a == b) as i64)
-                .sum(),
-        )
+        let reward = TARGET
+            .chars()
+            .take(state.0.len())
+            .zip(state.0.chars())
+            .map(|(a, b)| (a == b) as i64)
+            .sum();
+        (vec![(); moves.len()], reward)
     }
 
     fn interpret_evaluation_for_player(&self, evaln: &i64, _player: &()) -> i64 {
