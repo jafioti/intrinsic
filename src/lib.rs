@@ -501,43 +501,4 @@ mod tests {
         vars.insert('b', 2);
         assert_eq!(c.exec_stack(&vars, &mut Vec::new()).unwrap(), 53);
     }
-
-    #[test]
-    fn egglog_test() {
-        let mut egraph = EGraph::default();
-
-        // If we rerite most-exp to another term, that rewrite shouldnt trigger since its been subsumed.
-        egraph
-            .parse_and_run_program(
-                r#"
-                (datatype Math
-                  (Num i64)
-                  (Var String)
-                  (Add Math Math)
-                  (Mul Math Math))
-
-                ;; expr1 = 2 * (x + 3)
-                (let expr1 (Mul (Num 2) (Add (Var "x") (Num 3))))
-                ;; expr2 = 6 + 2 * x
-                (let expr2 (Add (Num 6) (Mul (Num 2) (Var "x"))))
-
-
-                ;; (rule ((= __root (Add a b)))
-                ;;       ((union __root (Add b a)))
-                (rewrite (Add a b)
-                         (Add b a))
-                (rewrite (Mul a (Add b c))
-                         (Add (Mul a b) (Mul a c)))
-                (rewrite (Add (Num a) (Num b))
-                         (Num (+ a b)))
-                (rewrite (Mul (Num a) (Num b))
-                         (Num (* a b)))
-
-                (run 10)
-                (check (= expr1 expr2))
-                "#,
-            )
-            .unwrap();
-        panic!("{:?}", egraph.get_extract_report());
-    }
 }
