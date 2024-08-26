@@ -8,7 +8,13 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::*;
 
+pub use egglog::{check_equals, egglog_simplify};
+
 pub type FastHashMap<K, V> = FxHashMap<K, V>;
+
+pub fn expr(a: impl Into<Expression>) -> Expression {
+    a.into()
+}
 
 thread_local! {
     static EXPRESSION_OWNER: RefCell<Option<Owner<UnsyncStorage>>> = RefCell::new(Some(UnsyncStorage::owner()));
@@ -486,9 +492,6 @@ impl<E: Into<Expression>> BitOrAssign<E> for Expression {
 
 #[cfg(test)]
 mod tests {
-    use egglog::*;
-    use symbol_table::GlobalSymbol;
-
     use crate::{Expression, FastHashMap};
 
     #[test]

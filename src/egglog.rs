@@ -1,11 +1,8 @@
 // Wrapper around EGraph type
 
-use egglog::ast::{Command, Expr};
-use egglog::sort::{BoolSort, F64Sort, I64Sort, StringSort};
-use egglog::{Error, ExtractReport, RunReport};
-use std::collections::VecDeque;
+use egglog::ast::Command;
+use egglog::Error;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::{Expression, Term};
 
@@ -18,7 +15,7 @@ pub struct EGraph {
     cmds: Option<String>,
 }
 
-type EggResult<T> = Result<T, Error>;
+// type EggResult<T> = Result<T, Error>;
 
 impl EGraph {
     fn new(
@@ -43,7 +40,7 @@ impl EGraph {
     /// Parse a program into a list of commands.
     fn parse_program(&self, input: &str) -> Option<Vec<Command>> {
         let commands = self.egraph.parse_program(input).unwrap();
-        Some(commands.into_iter().map(|x| x.into()).collect())
+        Some(commands)
     }
 
     /// Run a series of commands on the EGraph.
@@ -61,53 +58,53 @@ impl EGraph {
         self.egraph.run_program(commands)
     }
 
-    /// Returns the text of the commands that have been run so far, if `record` was passed.
-    fn commands(&self) -> Option<String> {
-        self.cmds.clone()
-    }
+    // /// Returns the text of the commands that have been run so far, if `record` was passed.
+    // fn commands(&self) -> Option<String> {
+    //     self.cmds.clone()
+    // }
 
-    /// Gets the last expressions extracted from the EGraph, if the last command
-    /// was a Simplify or Extract command.
-    fn extract_report(&mut self) -> Option<ExtractReport> {
-        self.egraph.get_extract_report().as_ref().cloned()
-    }
+    // /// Gets the last expressions extracted from the EGraph, if the last command
+    // /// was a Simplify or Extract command.
+    // fn extract_report(&mut self) -> Option<ExtractReport> {
+    //     self.egraph.get_extract_report().as_ref().cloned()
+    // }
 
-    /// Gets the last run report from the EGraph, if the last command
-    /// was a run or simplify command.
-    fn run_report(&mut self) -> Option<RunReport> {
-        self.egraph.get_run_report().as_ref().cloned()
-    }
+    // /// Gets the last run report from the EGraph, if the last command
+    // /// was a run or simplify command.
+    // fn run_report(&mut self) -> Option<RunReport> {
+    //     self.egraph.get_run_report().as_ref().cloned()
+    // }
 
-    fn eval_i64(&mut self, expr: Expr) -> EggResult<i64> {
-        self.eval_sort(expr, Arc::new(I64Sort::new("i64".into())))
-    }
+    // fn eval_i64(&mut self, expr: Expr) -> EggResult<i64> {
+    //     self.eval_sort(expr, Arc::new(I64Sort::new("i64".into())))
+    // }
 
-    fn eval_f64(&mut self, expr: Expr) -> EggResult<f64> {
-        self.eval_sort(expr, Arc::new(F64Sort::new("f64".into())))
-    }
+    // fn eval_f64(&mut self, expr: Expr) -> EggResult<f64> {
+    //     self.eval_sort(expr, Arc::new(F64Sort::new("f64".into())))
+    // }
 
-    fn eval_string(&mut self, expr: Expr) -> EggResult<String> {
-        let s: egglog::ast::Symbol =
-            self.eval_sort(expr, Arc::new(StringSort::new("String".into())))?;
-        Ok(s.to_string())
-    }
+    // fn eval_string(&mut self, expr: Expr) -> EggResult<String> {
+    //     let s: egglog::ast::Symbol =
+    //         self.eval_sort(expr, Arc::new(StringSort::new("String".into())))?;
+    //     Ok(s.to_string())
+    // }
 
-    fn eval_bool(&mut self, expr: Expr) -> EggResult<bool> {
-        self.eval_sort(expr, Arc::new(BoolSort::new("bool".into())))
-    }
+    // fn eval_bool(&mut self, expr: Expr) -> EggResult<bool> {
+    //     self.eval_sort(expr, Arc::new(BoolSort::new("bool".into())))
+    // }
 }
 
-impl EGraph {
-    fn eval_sort<T: egglog::sort::Sort, V: egglog::sort::FromSort<Sort = T>>(
-        &mut self,
-        expr: Expr,
-        arcsort: Arc<T>,
-    ) -> EggResult<V> {
-        let expr: egglog::ast::Expr = expr.into();
-        let (_, value) = self.egraph.eval_expr(&expr)?;
-        Ok(V::load(&arcsort, &value))
-    }
-}
+// impl EGraph {
+//     fn eval_sort<T: egglog::sort::Sort, V: egglog::sort::FromSort<Sort = T>>(
+//         &mut self,
+//         expr: Expr,
+//         arcsort: Arc<T>,
+//     ) -> EggResult<V> {
+//         let expr: egglog::ast::Expr = expr.into();
+//         let (_, value) = self.egraph.eval_expr(&expr)?;
+//         Ok(V::load(&arcsort, &value))
+//     }
+// }
 
 pub fn convert_expr_to_string(expr: crate::Expression) -> String {
     let mut stack = Vec::new();
@@ -131,61 +128,42 @@ pub fn convert_expr_to_string(expr: crate::Expression) -> String {
     stack.pop().unwrap()
 }
 
-pub fn convert_string_to_expr(input: &str) -> Result<crate::Expression, String> {
-    let mut tokens: Vec<&str> = input
+pub fn convert_string_to_expr(input: &str) -> crate::Expression {
+    let mut stack = vec![];
+    for token in input
         .split(|c| c == ' ' || c == '(' || c == ')')
-        .filter(|s| s.trim().len() > 0)
+        .filter(|s| !s.trim().is_empty() && s.trim() != "Var" && s.trim() != "Num")
+        .map(|s| s.trim_matches('"'))
         .rev()
-        .collect();
-    let mut stack = VecDeque::new();
-    let mut output = Vec::new();
-
-    while let Some(token) = tokens.pop() {
-        match token {
-            "Add" => stack.push_back(Term::Add),
-            "Sub" => stack.push_back(Term::Sub),
-            "Mul" => stack.push_back(Term::Mul),
-            "Div" => stack.push_back(Term::Div),
-            "Mod" => stack.push_back(Term::Mod),
-            "Min" => stack.push_back(Term::Min),
-            "Max" => stack.push_back(Term::Max),
-            "And" => stack.push_back(Term::And),
-            "Or" => stack.push_back(Term::Or),
-            "Gte" => stack.push_back(Term::Gte),
-            "Lt" => stack.push_back(Term::Lt),
-            "Var" => {
-                if let Some(var_name) = tokens.pop() {
-                    let var = var_name
-                        .trim_matches('"')
-                        .chars()
-                        .next()
-                        .ok_or("Empty variable name")?;
-                    output.push(Term::Var(var));
-                } else {
-                    return Err("Expected variable name after 'Var'".to_string());
-                }
-            }
-            "Num" => {
-                if let Some(num_str) = tokens.pop() {
-                    let num = num_str.parse::<i32>().map_err(|e| e.to_string())?;
-                    output.push(Term::Num(num));
-                } else {
-                    return Err("Expected number after 'Num'".to_string());
-                }
-            }
-            _ => return Err(format!("Unknown token: {}", token)),
-        }
-
-        if output.len() >= 2 && !stack.is_empty() {
-            output.push(stack.pop_back().unwrap());
+    {
+        if let Ok(n) = token.parse::<i32>() {
+            stack.push(vec![Term::Num(n)]);
+        } else if token.len() == 1 {
+            stack.push(vec![Term::Var(token.chars().next().unwrap())]);
+        } else {
+            let b = stack.pop().unwrap();
+            let mut a = stack.pop().unwrap();
+            let op = match token {
+                "Add" => Term::Add,
+                "Sub" => Term::Sub,
+                "Mul" => Term::Mul,
+                "Div" => Term::Div,
+                "Mod" => Term::Mod,
+                "Min" => Term::Min,
+                "Max" => Term::Max,
+                "And" => Term::And,
+                "Or" => Term::Or,
+                "Gte" => Term::Gte,
+                "Lt" => Term::Lt,
+                _ => panic!("wtf is this: {token}"),
+            };
+            a.extend(b.into_iter());
+            a.push(op);
+            stack.push(a);
         }
     }
 
-    while let Some(op) = stack.pop_back() {
-        output.push(op);
-    }
-
-    Ok(crate::Expression::new(output))
+    Expression::new(stack.pop().unwrap())
 }
 
 const EGGLOG_VOCAB: &str = "
@@ -217,8 +195,9 @@ const EGGLOG_RULES: &str = "
 ; Associative
 (rewrite (Add (Add a b) c) (Add a (Add b c)))
 (rewrite (Mul (Mul a b) c) (Mul a (Mul b c)))
-(rewrite (Div (Div a b) c) (Div a (Mul b c))) ; Weird ones, probably not nessecary
+(rewrite (Div (Div a b) c) (Div a (Mul b c)))
 (rewrite (Div (Mul a b) c) (Mul a (Div b c)))
+(rewrite (Mul a (Div b c)) (Div (Mul a b) c))
 
 ; Distributive
 (rewrite (Mul a (Add b c)) (Add (Mul a b) (Mul a c)))
@@ -228,6 +207,18 @@ const EGGLOG_RULES: &str = "
 (rewrite (Add (Num a) (Num b)) (Num (+ a b)))
 (rewrite (Sub (Num a) (Num b)) (Num (- a b)))
 (rewrite (Mul (Num a) (Num b)) (Num (* a b)))
+(rewrite (Div (Num a) (Num b)) (Num (/ a b)) :when ((!= 0 b) (= 0 (% a b))))
+(rewrite (Max (Num a) (Num b)) (Num (max a b)))
+(rewrite (Min (Num a) (Num b)) (Num (min a b)))
+(rewrite (And (Num a) (Num b)) (Num (& a b)))
+(rewrite (Or (Num a) (Num b)) (Num (| a b)))
+
+; Factoring
+(rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
+(rewrite (Add a a) (Mul (Num 2) a))
+
+; Other
+(rewrite (Add (Div a b) c) (Div (Add a (Mul c b)) b))
 ";
 
 pub fn egglog_simplify(expr: Expression) -> Expression {
@@ -238,12 +229,13 @@ pub fn egglog_simplify(expr: Expression) -> Expression {
             "{EGGLOG_VOCAB}
 {EGGLOG_RULES}
 (let expr1 {expr_string})
-(run-schedule (saturate (run)))
+;(run-schedule (saturate (run)))
+(run 5)
 (extract expr1)",
         ))
         .unwrap();
     let result = egraph.run_program(commands).unwrap();
-    convert_string_to_expr(&result[0]).unwrap()
+    convert_string_to_expr(&result[0])
 }
 
 pub fn check_equals(a: Expression, b: Expression) -> bool {
@@ -256,7 +248,8 @@ pub fn check_equals(a: Expression, b: Expression) -> bool {
 {EGGLOG_RULES}
 (let expr1 {a_string})
 (let expr2 {b_string})
-(run-schedule (saturate (run)))
+;(run-schedule (saturate (run)))
+(run 5)
 (check (= expr1 expr2))",
         ))
         .unwrap();
@@ -266,7 +259,7 @@ pub fn check_equals(a: Expression, b: Expression) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{expression_cleanup, Expression};
+    use crate::{expr, expression_cleanup, Expression};
 
     #[test]
     fn test_simplify() {
@@ -274,6 +267,23 @@ mod tests {
         assert!(check_equals(
             Expression::from('x') * 12 + 134,
             egglog_simplify(expr)
+        ));
+        expression_cleanup();
+    }
+
+    #[test]
+    fn test_simplify_hard() {
+        let o = (expr('z')
+            / ((-5
+                + (((((-5 + ((((((expr('w') + 153) / 2) / 2) / 2) / 2) / 2)) * 4) + 9) / 2) / 2))
+                * (-5
+                    + (((9 + (4 * (-5 + ((((((153 + expr('h')) / 2) / 2) / 2) / 2) / 2)))) / 2)
+                        / 2))))
+            % 64;
+        assert!(check_equals(
+            egglog_simplify(o),
+            (expr('z') / ((((expr('h') + -7) / 8) + -11) * ((((expr('w') + -7) / 8) + -11) / 16)))
+                % 64
         ));
         expression_cleanup();
     }
