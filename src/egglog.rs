@@ -230,7 +230,7 @@ pub fn egglog_simplify(expr: Expression) -> Expression {
 {EGGLOG_RULES}
 (let expr1 {expr_string})
 ;(run-schedule (saturate (run)))
-(run 5)
+(run 8)
 (extract expr1)",
         ))
         .unwrap();
@@ -280,10 +280,11 @@ mod tests {
                     + (((9 + (4 * (-5 + ((((((153 + expr('h')) / 2) / 2) / 2) / 2) / 2)))) / 2)
                         / 2))))
             % 64;
+        let r = egglog_simplify(o);
+        assert!(r.len() <= 15);
         assert!(check_equals(
-            egglog_simplify(o),
-            (expr('z') / ((((expr('h') + -7) / 8) + -11) * ((((expr('w') + -7) / 8) + -11) / 16)))
-                % 64
+            r,
+            (expr('z') / (((expr('w') + -95) * (expr('h') + -95)) / 1024)) % 64
         ));
         expression_cleanup();
     }
