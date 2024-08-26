@@ -3,9 +3,12 @@ name = "intrinsic"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = ["bin/test_expr"]
+
 [dependencies]
 egglog = "0.2.0"
 generational-box = "0.5.6"
-mcts = {git="https://github.com/zxqfl/mcts"}
+mcts = { git = "https://github.com/zxqfl/mcts" }
 rustc-hash = "2.0.0"
 symbol_table = "0.3.0"

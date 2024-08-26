@@ -8,7 +8,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::*;
 
-pub use egglog::{check_equals, egglog_simplify};
+pub use egglog::{check_equals, create_egraph, egglog_simplify, egglog_simplify_egraph};
 
 pub type FastHashMap<K, V> = FxHashMap<K, V>;
 
@@ -492,7 +492,7 @@ impl<E: Into<Expression>> BitOrAssign<E> for Expression {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Expression, FastHashMap};
+    use crate::{expression_cleanup, Expression, FastHashMap};
 
     #[test]
     fn test() {
@@ -503,5 +503,6 @@ mod tests {
         vars.insert('a', 3);
         vars.insert('b', 2);
         assert_eq!(c.exec_stack(&vars, &mut Vec::new()).unwrap(), 53);
+        expression_cleanup();
     }
 }

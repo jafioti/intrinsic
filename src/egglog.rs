@@ -13,6 +13,7 @@ use crate::{Expression, Term};
 pub struct EGraph {
     pub(crate) egraph: egglog::EGraph,
     cmds: Option<String>,
+    pub(crate) expr_count: usize,
 }
 
 // type EggResult<T> = Result<T, Error>;
@@ -32,7 +33,7 @@ impl EGraph {
         }
         Self {
             egraph,
-
+            expr_count: 0,
             cmds: if record { Some(String::new()) } else { None },
         }
     }
@@ -221,34 +222,51 @@ const EGGLOG_RULES: &str = "
 (rewrite (Add (Div a b) c) (Div (Add a (Mul c b)) b))
 ";
 
-pub fn egglog_simplify(expr: Expression) -> Expression {
+pub fn create_egraph() -> EGraph {
     let mut egraph = EGraph::new(None, false, false, false);
-    let expr_string = convert_expr_to_string(expr);
     let commands = egraph
         .parse_program(&format!(
             "{EGGLOG_VOCAB}
-{EGGLOG_RULES}
-(let expr1 {expr_string})
-;(run-schedule (saturate (run)))
-(run 8)
-(extract expr1)",
+{EGGLOG_RULES}",
         ))
         .unwrap();
+    egraph.run_program(commands).unwrap();
+    egraph
+}
+
+pub fn egglog_simplify_egraph(expr: Expression, egraph: &mut EGraph, iters: usize) -> Expression {
+    let expr_string = convert_expr_to_string(expr);
+    let commands = egraph
+        .parse_program(&format!(
+            "
+(let expr{} {expr_string})
+;(run-schedule (saturate (run)))
+(run {iters})
+(extract expr{})",
+            egraph.expr_count, egraph.expr_count
+        ))
+        .unwrap();
+    egraph.expr_count += 1;
     let result = egraph.run_program(commands).unwrap();
     convert_string_to_expr(&result[0])
 }
 
+pub fn egglog_simplify(mut expr: Expression, inner: usize, outer: usize) -> Expression {
+    for _ in 0..outer {
+        expr = egglog_simplify_egraph(expr, &mut create_egraph(), inner);
+    }
+    expr
+}
+
 pub fn check_equals(a: Expression, b: Expression) -> bool {
-    let mut egraph = EGraph::new(None, false, false, false);
+    let mut egraph = create_egraph();
     let a_string = convert_expr_to_string(a);
     let b_string = convert_expr_to_string(b);
     let commands = egraph
         .parse_program(&format!(
-            "{EGGLOG_VOCAB}
-{EGGLOG_RULES}
+            "
 (let expr1 {a_string})
 (let expr2 {b_string})
-;(run-schedule (saturate (run)))
 (run 5)
 (check (= expr1 expr2))",
         ))
@@ -266,7 +284,7 @@ mod tests {
         let expr = (Expression::from('x') + 2 + 8) * (4 * 3) + 14;
         assert!(check_equals(
             Expression::from('x') * 12 + 134,
-            egglog_simplify(expr)
+            egglog_simplify(expr, 5, 5)
         ));
         expression_cleanup();
     }
@@ -280,8 +298,8 @@ mod tests {
                     + (((9 + (4 * (-5 + ((((((153 + expr('h')) / 2) / 2) / 2) / 2) / 2)))) / 2)
                         / 2))))
             % 64;
-        let r = egglog_simplify(o);
-        assert!(r.len() <= 15);
+        let r = egglog_simplify(o, 5, 5);
+        assert!(r.len() <= 13);
         assert!(check_equals(
             r,
             (expr('z') / (((expr('w') + -95) * (expr('h') + -95)) / 1024)) % 64
