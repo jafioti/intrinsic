@@ -2,6 +2,7 @@
 
 use egglog::ast::Command;
 use egglog::Error;
+use rustc_hash::FxHashMap;
 use std::path::PathBuf;
 
 use crate::{Expression, Term};
@@ -107,12 +108,23 @@ impl EGraph {
 //     }
 // }
 
-pub fn convert_expr_to_string(expr: crate::Expression) -> String {
+pub fn convert_expr_to_string(expr: crate::Expression) -> (FxHashMap<char, String>, String) {
     let mut stack = Vec::new();
+    let mut char_idx: u8 = 97;
+    let mut var_map = FxHashMap::default();
+    let mut rev_var_map = FxHashMap::default();
 
     for term in expr.terms.read().iter() {
         match term {
             Term::Var(v) => {
+                let v = if let Some(v) = rev_var_map.get(v) {
+                    *v
+                } else {
+                    rev_var_map.insert(v.clone(), char_idx as char);
+                    var_map.insert(char_idx as char, v.clone());
+                    char_idx += 1;
+                    (char_idx - 1) as char
+                };
                 stack.push(format!("(Var \"{v}\")"));
             }
             Term::Num(n) => {
@@ -126,10 +138,10 @@ pub fn convert_expr_to_string(expr: crate::Expression) -> String {
             }
         }
     }
-    stack.pop().unwrap()
+    (var_map, stack.pop().unwrap())
 }
 
-pub fn convert_string_to_expr(input: &str) -> crate::Expression {
+pub fn convert_string_to_expr(input: &str, var_map: &FxHashMap<char, String>) -> crate::Expression {
     let mut stack = vec![];
     for token in input
         .split(|c| c == ' ' || c == '(' || c == ')')
@@ -140,7 +152,9 @@ pub fn convert_string_to_expr(input: &str) -> crate::Expression {
         if let Ok(n) = token.parse::<i32>() {
             stack.push(vec![Term::Num(n)]);
         } else if token.len() == 1 {
-            stack.push(vec![Term::Var(token.chars().next().unwrap())]);
+            stack.push(vec![Term::Var(
+                var_map.get(&token.chars().next().unwrap()).unwrap().clone(),
+            )]);
         } else {
             let b = stack.pop().unwrap();
             let mut a = stack.pop().unwrap();
@@ -218,6 +232,12 @@ const EGGLOG_RULES: &str = "
 (rewrite (Add (Mul a b) (Mul a c)) (Mul a (Add b c)))
 (rewrite (Add a a) (Mul (Num 2) a))
 
+; Simple reductions
+(rewrite (Add a (Num 0)) a)
+(rewrite (Mul a (Num 1)) a)
+(rewrite (Mul a (Num 0)) (Num 0))
+(rewrite (Div a (Num 1)) a)
+
 ; Other
 (rewrite (Add (Div a b) c) (Div (Add a (Mul c b)) b))
 ";
@@ -235,7 +255,7 @@ pub fn create_egraph() -> EGraph {
 }
 
 pub fn egglog_simplify_egraph(expr: Expression, egraph: &mut EGraph, iters: usize) -> Expression {
-    let expr_string = convert_expr_to_string(expr);
+    let (var_map, expr_string) = convert_expr_to_string(expr);
     let commands = egraph
         .parse_program(&format!(
             "
@@ -248,7 +268,7 @@ pub fn egglog_simplify_egraph(expr: Expression, egraph: &mut EGraph, iters: usiz
         .unwrap();
     egraph.expr_count += 1;
     let result = egraph.run_program(commands).unwrap();
-    convert_string_to_expr(&result[0])
+    convert_string_to_expr(&result[0], &var_map)
 }
 
 pub fn egglog_simplify(mut expr: Expression, inner: usize, outer: usize) -> Expression {
@@ -260,8 +280,8 @@ pub fn egglog_simplify(mut expr: Expression, inner: usize, outer: usize) -> Expr
 
 pub fn check_equals(a: Expression, b: Expression) -> bool {
     let mut egraph = create_egraph();
-    let a_string = convert_expr_to_string(a);
-    let b_string = convert_expr_to_string(b);
+    let (_, a_string) = convert_expr_to_string(a);
+    let (_, b_string) = convert_expr_to_string(b);
     let commands = egraph
         .parse_program(&format!(
             "

@@ -56,10 +56,10 @@ impl Default for Expression {
 }
 
 /// A single term of a symbolic expression such as a variable, number or operation.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Term {
     Num(i32),
-    Var(char),
+    Var(String),
     Add,
     Sub,
     Mul,
@@ -94,7 +94,7 @@ impl std::fmt::Debug for Term {
 }
 
 impl Term {
-    pub fn as_op(self) -> Option<fn(i64, i64) -> Option<i64>> {
+    pub fn as_op(&self) -> Option<fn(i64, i64) -> Option<i64>> {
         match self {
             Term::Add => Some(|a, b| a.checked_add(b)),
             Term::Sub => Some(|a, b| a.checked_sub(b)),
@@ -173,7 +173,7 @@ impl std::fmt::Display for Expression {
 impl Expression {
     pub fn exec_stack(
         &self,
-        variables: &FastHashMap<char, usize>,
+        variables: &FastHashMap<String, usize>,
         stack: &mut Vec<i64>,
     ) -> Option<usize> {
         for term in self.terms.read().iter() {
@@ -182,7 +182,7 @@ impl Expression {
                 Term::Var(c) =>
                 {
                     #[allow(clippy::needless_borrow)]
-                    if let Some(n) = variables.get(&c) {
+                    if let Some(n) = variables.get(c) {
                         stack.push(*n as i64)
                     } else {
                         return None;
@@ -215,13 +215,31 @@ impl From<Term> for Expression {
 
 impl From<char> for Expression {
     fn from(value: char) -> Self {
-        Expression::new(vec![Term::Var(value)])
+        Expression::new(vec![Term::Var(value.to_string())])
     }
 }
 
 impl From<&char> for Expression {
     fn from(value: &char) -> Self {
-        Expression::new(vec![Term::Var(*value)])
+        Expression::new(vec![Term::Var(value.to_string())])
+    }
+}
+
+impl From<String> for Expression {
+    fn from(value: String) -> Self {
+        Expression::new(vec![Term::Var(value)])
+    }
+}
+
+impl From<&String> for Expression {
+    fn from(value: &String) -> Self {
+        Expression::new(vec![Term::Var(value.clone())])
+    }
+}
+
+impl From<&str> for Expression {
+    fn from(value: &str) -> Self {
+        Expression::new(vec![Term::Var(value.to_string())])
     }
 }
 
@@ -364,7 +382,7 @@ impl<E: Into<Expression>> Add<E> for Expression {
     fn add(self, rhs: E) -> Self::Output {
         let rhs = rhs.into();
         let mut terms = rhs.terms.read().clone();
-        terms.extend(self.terms.read().iter().copied());
+        terms.extend(self.terms.read().iter().cloned());
         terms.push(Term::Add);
         Expression::new(terms)
     }
@@ -375,7 +393,7 @@ impl<E: Into<Expression>> Sub<E> for Expression {
     fn sub(self, rhs: E) -> Self::Output {
         let rhs = rhs.into();
         let mut terms = rhs.terms.read().clone();
-        terms.extend(self.terms.read().iter().copied());
+        terms.extend(self.terms.read().iter().cloned());
         terms.push(Term::Sub);
         Expression::new(terms)
     }
@@ -386,7 +404,7 @@ impl<E: Into<Expression>> Mul<E> for Expression {
     fn mul(self, rhs: E) -> Self::Output {
         let rhs = rhs.into();
         let mut terms = rhs.terms.read().clone();
-        terms.extend(self.terms.read().iter().copied());
+        terms.extend(self.terms.read().iter().cloned());
         terms.push(Term::Mul);
         Expression::new(terms)
     }
@@ -397,7 +415,7 @@ impl<E: Into<Expression>> Div<E> for Expression {
     fn div(self, rhs: E) -> Self::Output {
         let rhs = rhs.into();
         let mut terms = rhs.terms.read().clone();
-        terms.extend(self.terms.read().iter().copied());
+        terms.extend(self.terms.read().iter().cloned());
         terms.push(Term::Div);
         Expression::new(terms)
     }
@@ -408,7 +426,7 @@ impl<E: Into<Expression>> Rem<E> for Expression {
     fn rem(self, rhs: E) -> Self::Output {
         let rhs = rhs.into();
         let mut terms = rhs.terms.read().clone();
-        terms.extend(self.terms.read().iter().copied());
+        terms.extend(self.terms.read().iter().cloned());
         terms.push(Term::Mod);
         Expression::new(terms)
     }
@@ -419,7 +437,7 @@ impl<E: Into<Expression>> BitAnd<E> for Expression {
     fn bitand(self, rhs: E) -> Self::Output {
         let rhs = rhs.into();
         let mut terms = rhs.terms.read().clone();
-        terms.extend(self.terms.read().iter().copied());
+        terms.extend(self.terms.read().iter().cloned());
         terms.push(Term::And);
         Expression::new(terms)
     }
@@ -430,7 +448,7 @@ impl<E: Into<Expression>> BitOr<E> for Expression {
     fn bitor(self, rhs: E) -> Self::Output {
         let rhs = rhs.into();
         let mut terms = rhs.terms.read().clone();
-        terms.extend(self.terms.read().iter().copied());
+        terms.extend(self.terms.read().iter().cloned());
         terms.push(Term::Or);
         Expression::new(terms)
     }
@@ -500,8 +518,8 @@ mod tests {
         let b = Expression::from('b');
         let c: Expression = (100 + a * 2) / b;
         let mut vars = FastHashMap::default();
-        vars.insert('a', 3);
-        vars.insert('b', 2);
+        vars.insert("a".to_string(), 3);
+        vars.insert("b".to_string(), 2);
         assert_eq!(c.exec_stack(&vars, &mut Vec::new()).unwrap(), 53);
         expression_cleanup();
     }

@@ -14,5 +14,6 @@ fn main() {
     let r = egglog_simplify(orig, 8, 1);
     println!("{r} | {}", r.len());
     println!("Took {}s", now.elapsed().as_secs_f32());
+    println!("{}", egglog_simplify(Expression::from('a') * 1 + 0, 5, 5));
     expression_cleanup();
 }
