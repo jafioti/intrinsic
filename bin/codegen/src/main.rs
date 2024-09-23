@@ -6,23 +6,10 @@ use ir::*;
 fn main() {
     let a = Tensor("A".to_string());
     let graph = block(4, (a, 5), sum(block(5, (Ref(0), 1), exp(sin(refr(0))))));
-    let (kernel, var, mut grid) = codegen(
-        &graph,
-        0,
-        0,
-        false,
-        &[("A".to_string(), Expression::from(0))],
-    );
-    grid.append(&mut vec![1; 6 - grid.len()]);
-    println!(
-        "extern \"C\" __global__ void kernel(float *out, const float *A) {{
-{kernel}
-\tout[{}] = {var};
-}}",
-        grid_setter_idx(&grid)
-    );
-    let (grid, threadblock) = (grid[..3].to_vec(), grid[3..].to_vec());
-    println!("Grid: {grid:?} Threadblock: {threadblock:?}");
+    let (kernel, grid, threadblock) = codegen(&graph);
+    println!("{kernel}");
+    println!("{grid:?}");
+    println!("{threadblock:?}");
     expression_cleanup();
 }
 
@@ -60,7 +47,40 @@ fn grid_setter_idx(grid: &[u32]) -> String {
     }
 }
 
-fn codegen(
+fn codegen(block: &Block) -> (String, (u32, u32, u32), (u32, u32, u32)) {
+    let (input_string, tensors): (Vec<String>, Vec<(String, Expression)>) = block
+        .1
+        .iter()
+        .map(|(i, _)| match i {
+            Input::Tensor(Tensor(t)) => (
+                format!("const float *{t}"),
+                (t.to_string(), Expression::from(0)),
+            ),
+            _ => panic!(),
+        })
+        .unzip();
+    let (kernel, var, mut grid) = inner_codegen(block, 0, 0, false, &tensors);
+    grid.append(&mut vec![1; 6 - grid.len()]);
+    let kernel = format!(
+        "extern \"C\" __global__ void kernel(float *out{}) {{
+{kernel}
+\tout[{}] = {var};
+}}",
+        if !input_string.is_empty() {
+            format!(", {}", input_string.join(", "))
+        } else {
+            "".to_string()
+        },
+        grid_setter_idx(&grid)
+    );
+    (
+        kernel,
+        (grid[0], grid[1], grid[2]),
+        (grid[3], grid[4], grid[5]),
+    )
+}
+
+fn inner_codegen(
     block: &Block,
     grid_level: u8,
     iter_level: u8,
@@ -78,7 +98,8 @@ fn codegen(
     }
     match block.2.as_ref() {
         Body::Block(inner) => {
-            let (body, var, mut grid) = codegen(inner, grid_level + 1, iter_level, false, &tensors);
+            let (body, var, mut grid) =
+                inner_codegen(inner, grid_level + 1, iter_level, false, &tensors);
             if !is_iter {
                 grid.push(block.0 as u32);
             }
@@ -99,7 +120,7 @@ fn codegen(
         Body::Sum(inner) => {
             let iter_char = (iter_level + 97) as char;
             let (kernel, var, mut grid) =
-                codegen(inner, grid_level, iter_level + 1, true, &tensors);
+                inner_codegen(inner, grid_level, iter_level + 1, true, &tensors);
             let tabs = (0..iter_level + 1)
                 .map(|_| "\t")
                 .collect::<Vec<_>>()
