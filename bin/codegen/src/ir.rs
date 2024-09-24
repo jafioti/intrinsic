@@ -4,14 +4,8 @@ pub struct Ref(pub i64);
 pub struct Tensor(pub String);
 #[derive(Debug)]
 pub enum Input {
-    Block(Block),
     Ref(Ref),
     Tensor(Tensor),
-}
-impl From<Block> for Input {
-    fn from(value: Block) -> Self {
-        Input::Block(value)
-    }
 }
 impl From<Ref> for Input {
     fn from(value: Ref) -> Self {
