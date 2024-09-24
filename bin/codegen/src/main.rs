@@ -4,8 +4,7 @@ use intrinsic::{egglog_simplify, expression_cleanup, Expression};
 use ir::*;
 
 fn main() {
-    let a1 = Tensor("A1".to_string());
-    let b_graph = block(3, (a1, 1), exp(refr(0)));
+    let b_graph = block(3, (Tensor("A1".to_string()), 1), exp(refr(0)));
     let (kernel, grid, threadblock) = codegen(&b_graph);
     println!("B");
     println!("------------");
@@ -35,13 +34,13 @@ fn main() {
 }
 
 fn codegen(block: &Block) -> (String, (u32, u32, u32), (u32, u32, u32)) {
+    let (kernel, var, mut grid) = inner_codegen(block, 0, 0, false, &[]);
+    grid.append(&mut vec![1; 6 - grid.len()]);
     let input_string = get_input_tensors(block)
         .into_iter()
         .map(|t| format!("const float *{t}"))
         .collect::<Vec<_>>()
         .join(", ");
-    let (kernel, var, mut grid) = inner_codegen(block, 0, 0, false, &[]);
-    grid.append(&mut vec![1; 6 - grid.len()]);
     let kernel = format!(
         "extern \"C\" __global__ void kernel(float *out{}) {{
 {kernel}
@@ -147,7 +146,7 @@ fn gen_op(op: &Op, tensors: &[(String, Expression)]) -> String {
             format!(
                 "{}[{}]",
                 tensors[*a as usize].0,
-                egglog_simplify(tensors[*a as usize].1, 5, 1)
+                egglog_simplify(tensors[*a as usize].1, 3, 1)
             )
         }
     }
