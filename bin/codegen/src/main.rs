@@ -30,6 +30,28 @@ fn main() {
     println!("{kernel}");
     println!("{grid:?}");
     println!("{threadblock:?}");
+    let graph = block(
+        4,
+        (Tensor("A".to_string()), 15),
+        sum(block(5, (Ref(0), 3), sum(block(3, (Ref(0), 1), refr(0))))),
+    );
+    let (kernel, grid, threadblock) = codegen(&graph);
+    println!("C");
+    println!("------------");
+    println!("{kernel}");
+    println!("{grid:?}");
+    println!("{threadblock:?}");
+    let graph = block(
+        4,
+        (Tensor("A".to_string()), 15),
+        sum(block(5, (Ref(0), 3), sum(block(3, (Ref(0), 1), refr(0))))),
+    );
+    let (kernel, grid, threadblock) = codegen(&graph);
+    println!("Fin");
+    println!("------------");
+    println!("{kernel}");
+    println!("{grid:?}");
+    println!("{threadblock:?}");
     expression_cleanup();
 }
 
