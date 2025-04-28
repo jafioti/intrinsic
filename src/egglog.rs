@@ -6,25 +6,13 @@ use std::path::PathBuf;
 
 use crate::{Expression, Term};
 
-/// EGraph()
-/// --
-///
-/// Create an empty EGraph.
 pub struct EGraph {
     pub(crate) egraph: egglog::EGraph,
-    cmds: Option<String>,
     pub(crate) expr_count: usize,
 }
 
-// type EggResult<T> = Result<T, Error>;
-
 impl EGraph {
-    fn new(
-        fact_directory: Option<PathBuf>,
-        seminaive: bool,
-        terms_encoding: bool,
-        record: bool,
-    ) -> Self {
+    fn new(fact_directory: Option<PathBuf>, seminaive: bool, terms_encoding: bool) -> Self {
         let mut egraph = egglog::EGraph::default();
         egraph.fact_directory = fact_directory;
         egraph.seminaive = seminaive;
@@ -34,13 +22,12 @@ impl EGraph {
         Self {
             egraph,
             expr_count: 0,
-            cmds: if record { Some(String::new()) } else { None },
         }
     }
 
     /// Parse a program into a list of commands.
     fn parse_program(&self, input: &str) -> Option<Vec<Command>> {
-        let commands = self.egraph.parse_program(input).unwrap();
+        let commands = self.egraph.parse_program(None, input).unwrap();
         Some(commands)
     }
 
@@ -51,9 +38,6 @@ impl EGraph {
         let mut cmds_str = String::new();
         for cmd in &commands {
             cmds_str = cmds_str + &cmd.to_string() + "\n";
-        }
-        if let Some(cmds) = &mut self.cmds {
-            cmds.push_str(&cmds_str);
         }
 
         self.egraph.run_program(commands)
@@ -223,7 +207,7 @@ const EGGLOG_RULES: &str = "
 ";
 
 pub fn create_egraph() -> EGraph {
-    let mut egraph = EGraph::new(None, false, false, false);
+    let mut egraph = EGraph::new(None, false, false);
     let commands = egraph
         .parse_program(&format!(
             "{EGGLOG_VOCAB}
